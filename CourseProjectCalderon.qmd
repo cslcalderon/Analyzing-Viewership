@@ -1,0 +1,380 @@
+---
+title: "Dr. Who Viewership"
+author: "Sofia Calderon"
+format: html
+---
+
+## Introduction
+
+Dr. Who is a beloved show that has a unique position in television history as one of the longest-running and most beloved science fiction series. It was chosen for this analysis because its extensive run, spanning several decades, offers a rich dataset to explore trends in viewership. The show's format of changing lead actors and evolving storylines provides a dynamic context to examine how different eras, episodes, and narrative arcs impact viewer interest. In this analysis, we are specifically seeing the eff
+
+Overlooking each variable of interest:
+
+-   uk_viewership: total viewership in millions
+
+-   season_number: number of season for an episode
+
+-   episode_number: number of episode in a season
+
+-   type: type of episode: can be either 'episode' 'special' 'season start' or 'season end'
+
+-   first_aired: date of when episode first aired
+
+-   rating: rating of episode from 0 to 100
+
+I found this data from an online github repository where lots of datasets are stored for educational purposes and open to use by students, specifically rfordatascience/tidytuesday. The dataset itself contains 175 observations for all numeric variables. For the categorical variable of 'type' there are 128 normal episodes, 13 season start, 13 season finale, and 21 special episodes.
+
+When looking for a dataset, I wanted to analyze something interesting to me as well as something interesting to students like me to make everything more understandable as well as engaging.
+
+## Research Questions
+
+1.  Is an episodes viewership affected by the date of an episodes release?
+
+2.  Is an episodes viewership affected by the season number?
+
+3.  Is there a difference in viewership for different Dr. Who episodes such as normal episodes, specials, season starts and finales?
+
+## Data Exploration
+
+```{r}
+library(ggplot2)
+library(ggfortify)
+library(dplyr)
+drwho_episodes <- readr::read_csv('https://raw.githubusercontent.com/cslcalderon/tidytuesday/patch-1/data/2023/2023-11-28/drwho_episodes.csv', show_col_types = FALSE)
+```
+
+In exploring the data, I first decided to see how each variable is interacting with one another through the use of scatterplots and bar graphs. From looking at scatterplots, there does seem to be some linear relationship evident, and there does not seem to be a violation of linearity, just weak relationships between predictors and response variable. In terms of the exploration of the categorical variable, type, there does seem to be different distribution for each category that would also need to be explored in the rest of the analysis.
+
+```{r}
+ggplot(drwho_episodes, aes(x = first_aired, y = uk_viewers)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "UK Viewers vs First Aired Date", x = "First Aired Date", y = "UK Viewers")
+
+
+ggplot(drwho_episodes, aes(x = season_number, y = uk_viewers)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "UK Viewers vs Season Number", x = "Season Number", y = "UK Viewers")
+
+
+ggplot(drwho_episodes, aes(x = rating, y = uk_viewers)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "UK Viewers vs Rating", x = "Rating", y = "UK Viewers")
+
+
+ggplot(drwho_episodes, aes(x = episode_number, y = uk_viewers)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "UK Viewers vs Episode Number", x = "Episode Number", y = "UK Viewers")
+
+#bar plot
+
+ggplot(drwho_episodes, aes(x = type, y = uk_viewers, fill = type)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  labs(x = "Type", y = "UK Viewers", title = "UK Viewers by Episode Type")
+
+ggplot(drwho_episodes, aes(x = type, y = uk_viewers, fill = type)) +
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = "Type", y = "UK Viewers", title = "UK Viewers by Episode Type")
+
+
+table(drwho_episodes$type)
+```
+
+After getting a better sense of the predictors themselves in relation to the response variable, I wanted to check the their distribution and descriptive properties with histograms and boxplots. From the histograms, I can tell there is some right skew in uk_views (our response) and slight left skew of ratings. These two numeric variables are variable to change depending on an episode, so I found it appropriate to analyze them in this way. As for season_number, episode_number and first_aired, they are always increasing and analyzing their distribution is not as effective or useful in setting up for our model.
+
+```{r}
+hist(drwho_episodes$uk_viewers, main="Histogram of UK_Viwers", xlab="UK_Viewers", breaks=15, col="blue")
+boxplot(drwho_episodes$uk_viewers, main="Boxplot of UK Viewers", ylab="UK Viewers", col="blue")
+
+
+hist((drwho_episodes$rating), main="Histogram of Episode Ratings", xlab="Rating out of 100", breaks=15, col="red")
+boxplot(drwho_episodes$rating, main="Boxplot of Episode Ratings", ylab="Rating out of 100", col="red")
+```
+
+## Multiple Linear Regression Model
+
+In making our first Multiple Linear Regression Model, I simply inputted our response variable and all the predictors with no transformations of modifications.
+
+```{r}
+episodes_model <- lm(uk_viewers ~ first_aired + rating + type + episode_number + season_number, data = drwho_episodes)
+summary(episodes_model)
+autoplot(episodes_model)
+
+mean(episodes_model$residuals)
+```
+
+Off the bat, there seems to be slight violation of mean zeros that is close to insignificant as well as slight violation of normal distribution. There does seem to be some outliers in the data since they seem to be pulling model output in a certain direction.
+
+Analyzing the initial model, there are some significant predictors to uk_viewers such as an episodes' rating, being a season start episode, being a special episode, and episode number. Interpreting these significant results:
+
+-   For every unit increase in an episode's rating, uk_viewership increases by an estimated 0.0915193 million viewers.
+
+-   If an episode is a of type season_start, meaning it's the first episode in the season, it has an estimated 1.2035817 million more uk_viewers than a normal episode.
+
+-   If an episode is of type special episode, it has an estimated 2.8125225 million more uk_viewers than a normal episode.
+
+-   For every unit increase in an episode in a season, meaning the episode_number in a season, there is an estimated 0.0704941 million decrease in uk_viewership.
+
+The model's F-stat is 34.95 and since the p-val is less than 0.05, the model is accurate and statistically significant. In terms of R squared, 57.73% of the variability in uk_viewership can be accounted by the predictors in the model. In terms of RSE, on average, the actual values of the dependent variable deviate from the model's predicted values by approximately 1.116 units.
+
+To improve model, I first wanted to make some transformations, and started with adjusting uk_viewers. I attempted a log transformation which significant helped improve the distribution to be more normal and get rid of the skew seen before. In analyzing the autoplot after this adjustment, there are slight, but meaningful, improvements to mean zeros and normal distribution assumptions. Because of this, I decided to keep this transformation while experimenting with other ways to transform the rest of the data.
+
+```{r}
+hist(log(drwho_episodes$uk_viewers), main="Histogram of Log(UK_Viwers)", xlab="UK_Viewers", breaks=15, col="lightblue")
+
+using_log_model <- lm(log(uk_viewers) ~ first_aired + rating + type + episode_number + season_number, data = drwho_episodes)
+summary(using_log_model)
+autoplot(using_log_model)
+```
+
+Next up on this list, there was an attempt at using splines on some of the numeric predictors to see any significant improvements on meeting some more assumptions better. When a modification was applied to first_aired where there was a stronger deviation from zeros from mean residuals, a stronger deviation from normal distribution seen on the qq plot, as well as homoscedasticity.
+
+I then went ahead and tried to make the same modification to episode_number, where there was very slight, almost insignificant improvements. I then tried to pair this with the same adjustment to season_number, where the almost equal result was seen.
+
+Because of these results, I opted for not including any spline modifications, but I did transform the response, uk_viewers, with a log transformation.
+
+```{r}
+library(splines)
+drwho_episodes$log_uk_viewers <- log(drwho_episodes$uk_viewers)
+aired_model_test <- lm(log(uk_viewers) ~ ns(first_aired, df = 4) + rating + type + episode_number, data = drwho_episodes)
+summary(aired_model_test)
+
+autoplot(aired_model_test)
+
+episode_model_test <- lm(log(uk_viewers) ~ ns(episode_number, df = 5) + rating + type + ns(season_number, df = 5), data = drwho_episodes)
+summary(episode_model_test)
+
+episode_model_test2 <- lm(log_uk_viewers ~ episode_number + rating + type + season_number + first_aired, data = drwho_episodes)
+
+autoplot(episode_model_test)
+autoplot(episode_model_test2)
+```
+
+Testing Out Interactions
+
+```{r}
+interaction_model <- lm(log_uk_viewers ~ episode_number + rating + type + season_number:first_aired, data = drwho_episodes)
+summary(interaction_model)
+autoplot(interaction_model)
+```
+
+When including an interaction, there does not seem to be improvements to the assumptions or distribution seen within the mode. Because of this, I am opting to not include it.
+
+```{r}
+improved_ep_model <- episode_model_test2
+autoplot(improved_ep_model)
+mean(improved_ep_model$residuals)
+```
+
+With this final model, the autoplot result shows improvements in mean zeros, homoscedasticity, as well as slight improvements in normal distribution. When calculated, the mean for residuals was -1.268826e-18, which is very close to 0, and shows that even with the deviation seen in autoplot, the assumption is met.
+
+## Formal Hypothesis Tests
+
+1.  **Episode Viewership vs. Release Date:**
+
+    -   Ho: Bdate = 0
+
+    -   Ha: Bdate != 0
+
+2.  **Episode Viewership vs. Season Number:**
+
+    -   Ho: Bseason = 0
+
+    -   Ha: Bseason != 0
+
+3.  **Episode Viewership Differences by Episode Type:**
+
+    -   Ho: Btype_normal = Btype_special = Btype_season_start = Btype_finale
+
+    -   Ha: At least one Btype differs
+
+```{r}
+print("Summary of Model")
+saved_summary <- summary(improved_ep_model)
+saved_summary
+
+print("Drop 1 Test")
+drop1(improved_ep_model, test = "F")
+```
+
+For the first two hypotheses tests, I decided to use the summary that was outputted from our improved model. These results indicated that:
+
+-   In regards to our first hypothesis, first_aired predictor has a p-val of more than 0.05, which means that it is not statistically significant, and in turn is not a good predictor of uk_viewers when controlling for all other variables. Because of this, we have to fail to reject the null and conclude that Bdate is equal to 0 (df = 167, t = -1.962, p \> 0.05).
+
+-   In regards to our second hypothesis, an episodes' season_number within the model has a p-val of more than 0.05, which means that it is also not statistically significant, and in turn in not a good predictor of uk_viewers when controllong for all other variables. Because of this, we have to fail to reject the null and conclude that Bseasons is equal to 0 (df = 167, t = 1.290, p \> 0.05).
+
+For the third hypothesis test, I decided to use an anova test to better see the significance of the type variable before analyzing the individual categories themselves.
+
+-   When performing an anova test, the type predictor has a p-val of less than 0.05, specifically being 2.37e-14. This can lead us to reject the null that Btype_normal = Btype_special = Btype_season_start = Btype_finale, and conclude that at least one Btype differs.
+
+-   After the anova test was performed, I looked back at the summary results of the final model that was used and looked to see which Btype were significant. The results are analyzed below:
+
+    -   An episode being the start of a season, increases an episodes' log(uk_viewers) by 0.1639 compared to a normal episode (p \<0.05)
+
+    -   An episode being a special episode, increases an episodes log(uk_viewers) by 0.3064 compared to a normal episode. (p\<0.05)
+
+    -   An episode being a season finale, does not have any statistically significant effect on log(uk_viewership) when compared to a normal episode. (p \> 0.05)
+
+-   Overall initial conclusions:
+
+    -   The model itself has a p-val of less than 0.05, so it can be taken seriously and seen as statically significant. Even with this, some limitations are that we aren't able to see some other factors that might have to do with viewership such as content of an episode or guest appearances that might give us more indication of the trends we are seeing.
+
+```{r}
+# Extract the p-values from the model summary
+p_values <- c(0.016495, 0.044564, 0.002776, 0.230458, 0.000809, 1.45e-14, 0.198897, 0.051411)
+
+# Apply Bonferroni adjustment
+adjusted_p_values <- p.adjust(p_values, method = "bonferroni")
+
+# Create a data frame to display the variables and p-values
+results <- data.frame(
+  Variable = c("(Intercept)", "episode_number", "rating", "typeseason finale", 
+               "typeseason start", "typespecial", "season_number", "first_aired"),
+  Original_P_Value = p_values,
+  Bonferroni_Adjusted_P_Value = adjusted_p_values
+)
+
+# Print the data frame
+print(results)
+```
+
+After Bonferroni the new p-values are as listed above. The predictors that are still significant after this adjustment are rating, season start episodes, and special episodes. What this means is that variables that were significant before and are not anymore might have been false positives when not taking into account a conservative approach, and don't actually have the perceived effect on the response variable as previously thought before accounting for the increased risk of making a Type I error.
+
+## Robustness of Results
+
+To test the robustness of results, a boostrap was performed on the model to be able to see if there is any evidence of under or over estimation within the model.
+
+```{r}
+library(simpleboot)
+confint_perclm <- function(object, level = 0.95) {
+  L <- (1 - level) / 2
+  U <- 1 - L
+  t(perc.lm(object, c(L, U)))
+}
+
+get_se_lm <- function(object) {
+  sqrt(diag(vcov(object)))
+}
+
+se_lm_boot <- function(object) {
+  summary(object)[["stdev.params"]]
+}
+```
+
+```{r}
+boot_results <- lm.boot(improved_ep_model, R = 999)
+se_lm_boot(boot_results)
+summary(boot_results)
+
+```
+
+When looking at the Boostrap's Sd compared to the original standard errors, we can analyze them side by side in the table below:
+
+| Name               | Original Standard Error | Bootstrap SD's |
+|--------------------|-------------------------|----------------|
+| Intercept          | 1.311                   | 1.4836         |
+| Episode_number     | 0.003529                | 0.0037         |
+| rating             | 0.00453                 | 0.005023       |
+| type season finale | 0.04866                 | 0.0511         |
+| type season start  | 0.04805                 | 0.0555         |
+| type special       | 0.0363                  | 0.0558         |
+| season_number      | 0.04505                 | 0.0502         |
+| first_aired        | 0.00008986              | 0.00010        |
+
+When looking at table, the original SE are very close to the Boostrap SD's which can lead us to the conclusion that our inference and model is robust to violations of assumptions. There is not significant evidence that original model is under or over estimating.
+
+```{r}
+predict_loo <- function(model) {
+  y <- model.frame(model)[,1]
+  loo_r <- residuals(model) / (1 - hatvalues(model))
+  return(y - loo_r)
+}
+
+predict_loo_mse <- function(model) {
+  y <- model.frame(model)[,1]
+  loo_r <- residuals(model) / (1 - hatvalues(model))
+  loo_predictions <- y - loo_r
+  mse <- mean((y - loo_predictions)^2)
+  return(mse)
+}
+
+predict_loo_mse(improved_ep_model)
+
+
+rsq_loo <- function(model) {
+  y <- model.frame(model)[,1]
+  yhat <- predict_loo(model)
+  return(cor(y, yhat)^2)
+}
+
+rsq_loo(improved_ep_model)
+summary(improved_ep_model)
+```
+
+**Cross-Validation of LOO Prediction Error:** The result of this calculation is 0.0242232 for MSE (means squared error). This is the average squares difference between observed values and the predictions that my model is making. Since log(uk_viewers) has a large scale, this small value is indicative of good predictive performance. Also, when calculating our original MSE it is equal to RSE\^2 so 0.14932 \^2. This gives us an orignal MSE of 0.02229. This is very close to our LOOCV MSE, which means our model is generalizing well and not overfitting.
+
+In regards to LOOCV using R squared, LOO R squared is 0.5265816 which states that about 52% of the variability in the log_ukviewers is accounted for by the predictors. Compared to the original value of about 56%, we can state that this is a good fit and not overfitting since the values are very similar to each other.
+
+**Outliers + High Leverage Points**
+
+```{r}
+library(car)
+influencePlot(improved_ep_model)
+autoplot(improved_ep_model)
+```
+
+```{r}
+no_outliers_drwho_episodes <- drwho_episodes[-c(173, 174, 145), ]
+ep_model_no_outliers <- lm(log_uk_viewers ~ episode_number + season_number + type + rating + first_aired, data = no_outliers_drwho_episodes )
+autoplot(ep_model_no_outliers)
+
+influencePlot(ep_model_no_outliers)
+```
+
+When removing the outliers, there is not a significant change to meeting more assumptions such as mean residuals zeros or normal distribution. Because of this, choosing to keep the outliers to be more accurate to the way the data was presented and gathered organically. The points themselves also don't have that much leverage over the data and even with their removal there are other outliers identified.
+
+There is also no evidence that the data is overfit because of the small amount of variables and low complexity of the model.
+
+```{r}
+vif(improved_ep_model)
+vif(interaction_model, type = "predictor")
+```
+
+After analyzing VIF values, epsisode_number, rating, and type have weak almost insignficant multicolinearity issues. Season_number and first_aired though have VIF values of over 200 which states extremely concerning multicolinearity, but I can speculate as to why this is. I think its very plausible that season_number and first_aired are highly correlated due to the nature of TV shows. Since shows are often sequential a season's number is very much related to a date, for example season 1 likely came out within the same month, and there are significant gaps in times between each season due to filming taking place.
+
+Despite this, this poses a problem in regression analysis because of how the model interprets this. Because these variables are so highly correlated, I would choose to only keep season_number for the purposes of completing my hypothesis and not running into these issues. If there is still a problem after removing first_aired, I would consider removing season_number to avoid weakening and diminishing the model's prediction accuracy. I would also possibly consider doing an interaction term to further analyze this relationship as it seems to reduce VIF values compared to original model.
+
+## Conclusions
+
+The following conclusions are sorted by research question below:
+
+In regards to the research question: **Episode Viewership vs. Release Date**
+
+-   There is no evidence that the original date of an episode's airing is a predictor on log(uk_viewers).
+
+In regards to the research question: **Episode Viewership vs. Season Number**
+
+-   There is no evidence that the season of an episode's airing is a predictor on log(uk_viewers).
+
+In regards to the research question: **Episode Viewership Differences by Episode Type**
+
+-   There is evidence that the type of episode increases log(uk_viewership), specifically the first episode of a new season and 'special' episodes. compared to a normal episode. There is no statistical significant evidence that a season finale has an effect on viewership compared to a normal episode.
+
+Personal Reflections:
+
+I learned that my dataset does not have as many linear or significant relationships as I previously thought. I came into this thinking that there would be some trends seen in how long ago an episode aired, what season it was a part of, as well as some more statistical relationships in which episode it was within its season. I came in with this mindset based on my experiences with watching shows in general which is that attention and excitement tends to taper off as the seasons drag on. After conducting this analysis though, I learned that this was not the case and there might be certain factors that are to be considered such as content or subjects within episodes and possibly external factors around episodes such as holidays and advertisements and commercials that could influence viewership.
+
+I also came in thinking that specials and season finales were going to get more viewership than normal episodes, but was surprised when it was actually season starts instead of season finales that seem to drive viewership up. This was interesting because it did get me thinking that people are excited and driven to watch when something new comes up rather than ending a season, but more analysis and possibly polling could be done to reach a more insightful conclusion as to why this is.
+
+**Future Avenues:**
+
+As previously mentioned, it would be nice to get more insight on each episode's content such as if they are a continuance of a previously established plot or starting a new arc, any guest stars, and how highly was it advertised on other platforms.
+
+To make more sense of the newly gathered data, I would also like to conduct polls from viewers to be able to gain a more qualitative sense of what the results mean.
+
+Additionally, I also think that this type of research is very versatile and easily applicable to other shows and TV production companies to analyze viewership and to help determine which types of episodes to put out, how often, and how long seasons should be.
